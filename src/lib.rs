@@ -91,7 +91,7 @@ pub struct Normalized(pub f64);
 ///
 /// Argument "**number**" is the number of individuals who are allowed to mate.
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq)]
-struct Best(pub usize);
+pub struct Best(pub usize);
 
 /// Apply a simple percentile based threshold to the population.
 /// Mating pairs are selected with uniform random probability from the eligible
@@ -597,7 +597,7 @@ impl Percentile {
             "argument \"percentile\" is out of bounds [0, 1]"
         );
         let num_eligible = ((1.0 - percentile) * scores.len() as f64).round() as usize;
-        arg_nth_max(num_eligible.max(1), &scores)
+        arg_nth_max(num_eligible.max(1), scores)
     }
 }
 impl<R: Rng + ?Sized> MateSelection<R> for Percentile {
