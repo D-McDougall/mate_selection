@@ -254,12 +254,12 @@ mod python {
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             self.0.pairs(rng, amount, scores)
         }
         /// Choose multiple weighted
         fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             self.0.select(rng, amount, scores)
         }
         /// Probability distribution function
@@ -283,12 +283,12 @@ mod python {
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             self.0.pairs(rng, amount, scores)
         }
         /// Choose multiple weighted
         fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             self.0.select(rng, amount, scores)
         }
         /// Probability distribution function
@@ -318,12 +318,12 @@ mod python {
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             self.0.pairs(rng, amount, scores)
         }
         /// Choose multiple weighted
         fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             self.0.select(rng, amount, scores)
         }
         /// Probability distribution function
@@ -353,12 +353,12 @@ mod python {
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             self.0.pairs(rng, amount, scores)
         }
         /// Choose multiple weighted
         fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             self.0.select(rng, amount, scores)
         }
         /// Probability distribution function
@@ -388,12 +388,12 @@ mod python {
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             self.0.pairs(rng, amount, scores)
         }
         /// Choose multiple weighted
         fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             self.0.select(rng, amount, scores)
         }
         /// Probability distribution function
@@ -423,12 +423,12 @@ mod python {
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             self.0.pairs(rng, amount, scores)
         }
         /// Choose multiple weighted
         fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             self.0.select(rng, amount, scores)
         }
         /// Probability distribution function
@@ -458,12 +458,12 @@ mod python {
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             self.0.pairs(rng, amount, scores)
         }
         /// Choose multiple weighted
         fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             self.0.select(rng, amount, scores)
         }
         /// Probability distribution function
@@ -735,7 +735,7 @@ mod tests {
 
     #[test]
     fn no_data() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         let pairs = Proportional.pairs(rng, 0, vec![]);
         assert!(pairs.is_empty());
 
@@ -745,7 +745,7 @@ mod tests {
 
     #[test]
     fn truncate_top_one() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         // Truncate all but the single best individual.
         let algo = Percentile(0.99);
         let weights: Vec<f64> = (0..100).map(|x| x as f64 / 100.0).collect();
@@ -755,7 +755,7 @@ mod tests {
 
     #[test]
     fn truncate_top_two() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         // Truncate all but the best two individuals.
         let algo = Percentile(0.98);
         let weights: Vec<f64> = (0..100).map(|x| x as f64 / 100.0).collect();
@@ -765,7 +765,7 @@ mod tests {
 
     #[test]
     fn truncate_none() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         // Truncate none of the individuals.
         let algo = Percentile(0.0);
         let weights: Vec<f64> = (0..100).map(|x| x as f64 / 100.0).collect();
@@ -776,7 +776,7 @@ mod tests {
 
     #[test]
     fn truncate_all() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         // Truncating all individuals should actually just return the single
         // best individual. This situation happens when building the starting
         // population.
@@ -788,13 +788,13 @@ mod tests {
 
     #[test]
     fn all_equal_to_the_best() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         Best(3).select(rng, 1, vec![4.0, 4.0, 4.0, 4.0]);
     }
 
     #[test]
     fn propotional() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         // All scores are equal, proportional should select all of the items.
         let weights = vec![1.0; 10];
         let algo = Proportional;
@@ -804,7 +804,7 @@ mod tests {
 
     #[test]
     fn propotional_outlier() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         // Index 0 is an outlier. Proportional selection should allow the
         // outlier to dominate the sample. The other items should not be selected.
         let weights = vec![1000_000_000_000_000.0, 1.0, 1.0, 1.0];
@@ -816,7 +816,7 @@ mod tests {
 
     #[test]
     fn propotional_negative() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         // One score is extremely negative and another is NAN.
         // Proportional should ignore them.
         let mut weights = vec![1.0; 12];
@@ -829,7 +829,7 @@ mod tests {
 
     #[test]
     fn normalized() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         // Normalize can deal with negative scores, it does not care about their absolute values.
         let weights = vec![-20.0, -12.0, -11.0, -10.5, -10.0, -9.5, -9.0, -8.0, 0.0];
         const MEAN_IDX: usize = 4;
@@ -846,7 +846,7 @@ mod tests {
 
     #[test]
     fn ranked_linear() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         // Index 0 is an outlier.
         // Ranking the scores should prevent the outlier from dominating.
         let weights = vec![1000_000_000_000_000.0, 1.0, 1.0, 1.0];
@@ -860,7 +860,7 @@ mod tests {
     /// Finds those off-by-one errors.
     #[test]
     fn ranked_linear_single() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         let weights = vec![4.0];
         let algo = RankedLinear(0.5);
         let selected = flatten_and_sort(&algo.pairs(rng, 1, weights));
@@ -869,7 +869,7 @@ mod tests {
 
     #[test]
     fn ranked_linear_outlier() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         // Index 0 is an outlier.
         // Ranking the scores should prevent the outlier from dominating.
         let mut weights = vec![1000_000_000_000_000.0];
@@ -883,7 +883,7 @@ mod tests {
 
     #[test]
     fn ranked_exponential() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         let test_cases = [
             (1, 1, 2, 99), // Test selecting with one single weight does not crash.
             (3, 1, 4, 1),
@@ -914,7 +914,7 @@ mod tests {
     /// Check that this avoids mating individuals with themselves.
     #[test]
     fn pairs() {
-        let rng = &mut rand::thread_rng();
+        let rng = &mut rand::rng();
         // N is the population size.
         // P is the number of mating pairs.
         // R is the percent of the pairs that are duplicates.
@@ -946,7 +946,7 @@ mod tests {
         type Rng = rand::rngs::ThreadRng;
 
         fn foobar(select: &dyn MateSelection<Rng>) {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             select.select(rng, 0, vec![]);
         }
 
