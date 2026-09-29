@@ -1,11 +1,10 @@
 //! A collection of mate selection methods for evolutionary algorithms
 
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 /// Mate selection algorithms randomly select pairs of individuals from a population.  
 /// The sampling probability of each individuals is a function of its reproductive fitness or "score".  
-pub trait MateSelection<R: Rng + ?Sized>: std::fmt::Debug {
+pub trait MateSelection: std::fmt::Debug + Send + Sync {
     /// Choose multiple weighted pairs
     ///
     /// * Argument `amount` is the number of pairs to return.
@@ -16,8 +15,8 @@ pub trait MateSelection<R: Rng + ?Sized>: std::fmt::Debug {
     ///   The parents are specified as indices into the scores list.
     ///
     /// This implementation almost never mates an individual with itself.
-    fn pairs(&self, rng: &mut R, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-        let mut pairs = self.select(rng, amount * 2, scores);
+    fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
+        let mut pairs = self.select(amount * 2, scores);
 
         reduce_repeats(&mut pairs);
 
@@ -25,7 +24,9 @@ pub trait MateSelection<R: Rng + ?Sized>: std::fmt::Debug {
     }
 
     /// Choose multiple weighted
-    fn select(&self, rng: &mut R, amount: usize, scores: Vec<f64>) -> Vec<usize> {
+    fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
+        let rng = &mut rand::rng();
+
         if amount == 0 {
             return vec![];
         } else {
@@ -56,7 +57,7 @@ pub trait MateSelection<R: Rng + ?Sized>: std::fmt::Debug {
 
 /// Select parents with a uniform random probability, ignoring the scores.
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq)]
-pub struct Random;
+pub struct Random();
 
 /// Select parents with a probability that is directly proportional to their score.
 ///
@@ -70,7 +71,7 @@ pub struct Random;
 /// Negative or invalid (NaN) scores are discarded and those individuals are
 /// not permitted to mate.
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq)]
-pub struct Proportional;
+pub struct Proportional();
 
 /// Normalize the fitness scores into a standard normal distribution.
 /// First the scores are normalized into a standard distribution and then they
@@ -243,7 +244,7 @@ mod python {
     impl Random {
         #[new]
         fn new() -> Self {
-            Self(super::Random)
+            Self(super::Random())
         }
         fn __str__(&self) -> String {
             "mate_selection.Random()".to_string()
@@ -254,17 +255,15 @@ mod python {
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            let rng = &mut rand::rng();
-            self.0.pairs(rng, amount, scores)
+            self.0.pairs(amount, scores)
         }
         /// Choose multiple weighted
         fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            let rng = &mut rand::rng();
-            self.0.select(rng, amount, scores)
+            self.0.select(amount, scores)
         }
         /// Probability distribution function
         fn pdf(&self, scores: Vec<f64>) -> Vec<f64> {
-            <super::Random as MateSelection<rand::rngs::ThreadRng>>::pdf(&self.0, scores)
+            <super::Random as MateSelection>::pdf(&self.0, scores)
         }
     }
 
@@ -272,7 +271,7 @@ mod python {
     impl Proportional {
         #[new]
         fn new() -> Self {
-            Self(super::Proportional)
+            Self(super::Proportional())
         }
         fn __str__(&self) -> String {
             "mate_selection.Proportional()".to_string()
@@ -283,17 +282,15 @@ mod python {
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            let rng = &mut rand::rng();
-            self.0.pairs(rng, amount, scores)
+            self.0.pairs(amount, scores)
         }
         /// Choose multiple weighted
         fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            let rng = &mut rand::rng();
-            self.0.select(rng, amount, scores)
+            self.0.select(amount, scores)
         }
         /// Probability distribution function
         fn pdf(&self, scores: Vec<f64>) -> Vec<f64> {
-            <super::Proportional as MateSelection<rand::rngs::ThreadRng>>::pdf(&self.0, scores)
+            <super::Proportional as MateSelection>::pdf(&self.0, scores)
         }
     }
 
@@ -318,17 +315,15 @@ mod python {
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            let rng = &mut rand::rng();
-            self.0.pairs(rng, amount, scores)
+            self.0.pairs(amount, scores)
         }
         /// Choose multiple weighted
         fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            let rng = &mut rand::rng();
-            self.0.select(rng, amount, scores)
+            self.0.select(amount, scores)
         }
         /// Probability distribution function
         fn pdf(&self, scores: Vec<f64>) -> Vec<f64> {
-            <super::Normalized as MateSelection<rand::rngs::ThreadRng>>::pdf(&self.0, scores)
+            <super::Normalized as MateSelection>::pdf(&self.0, scores)
         }
     }
 
@@ -353,17 +348,15 @@ mod python {
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            let rng = &mut rand::rng();
-            self.0.pairs(rng, amount, scores)
+            self.0.pairs(amount, scores)
         }
         /// Choose multiple weighted
         fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            let rng = &mut rand::rng();
-            self.0.select(rng, amount, scores)
+            self.0.select(amount, scores)
         }
         /// Probability distribution function
         fn pdf(&self, scores: Vec<f64>) -> Vec<f64> {
-            <super::Best as MateSelection<rand::rngs::ThreadRng>>::pdf(&self.0, scores)
+            <super::Best as MateSelection>::pdf(&self.0, scores)
         }
     }
 
@@ -388,17 +381,15 @@ mod python {
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            let rng = &mut rand::rng();
-            self.0.pairs(rng, amount, scores)
+            self.0.pairs(amount, scores)
         }
         /// Choose multiple weighted
         fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            let rng = &mut rand::rng();
-            self.0.select(rng, amount, scores)
+            self.0.select(amount, scores)
         }
         /// Probability distribution function
         fn pdf(&self, scores: Vec<f64>) -> Vec<f64> {
-            <super::Percentile as MateSelection<rand::rngs::ThreadRng>>::pdf(&self.0, scores)
+            <super::Percentile as MateSelection>::pdf(&self.0, scores)
         }
     }
 
@@ -423,17 +414,15 @@ mod python {
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            let rng = &mut rand::rng();
-            self.0.pairs(rng, amount, scores)
+            self.0.pairs(amount, scores)
         }
         /// Choose multiple weighted
         fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            let rng = &mut rand::rng();
-            self.0.select(rng, amount, scores)
+            self.0.select(amount, scores)
         }
         /// Probability distribution function
         fn pdf(&self, scores: Vec<f64>) -> Vec<f64> {
-            <super::RankedLinear as MateSelection<rand::rngs::ThreadRng>>::pdf(&self.0, scores)
+            <super::RankedLinear as MateSelection>::pdf(&self.0, scores)
         }
     }
 
@@ -458,22 +447,20 @@ mod python {
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            let rng = &mut rand::rng();
-            self.0.pairs(rng, amount, scores)
+            self.0.pairs(amount, scores)
         }
         /// Choose multiple weighted
         fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            let rng = &mut rand::rng();
-            self.0.select(rng, amount, scores)
+            self.0.select(amount, scores)
         }
         /// Probability distribution function
         fn pdf(&self, scores: Vec<f64>) -> Vec<f64> {
-            <super::RankedExponential as MateSelection<rand::rngs::ThreadRng>>::pdf(&self.0, scores)
+            <super::RankedExponential as MateSelection>::pdf(&self.0, scores)
         }
     }
 }
 
-impl<R: Rng + ?Sized> MateSelection<R> for Random {
+impl MateSelection for Random {
     fn sample_weight(&self, mut scores: Vec<f64>) -> Vec<f64> {
         scores.fill(1.0);
         scores
@@ -487,12 +474,13 @@ impl<R: Rng + ?Sized> MateSelection<R> for Random {
         scores
     }
 
-    fn select(&self, rng: &mut R, amount: usize, scores: Vec<f64>) -> Vec<usize> {
+    fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
+        let rng = &mut rand::rng();
         stochastic_universal_sampling::choose_multiple(rng, amount, scores.len())
     }
 }
 
-impl<R: Rng + ?Sized> MateSelection<R> for Proportional {
+impl MateSelection for Proportional {
     fn sample_weight(&self, mut scores: Vec<f64>) -> Vec<f64> {
         // Replace negative & invalid values with zero.
         for x in scores.iter_mut() {
@@ -502,7 +490,7 @@ impl<R: Rng + ?Sized> MateSelection<R> for Proportional {
     }
 }
 
-impl<R: Rng + ?Sized> MateSelection<R> for Normalized {
+impl MateSelection for Normalized {
     fn sample_weight(&self, mut scores: Vec<f64>) -> Vec<f64> {
         let cutoff = self.0;
         assert!(cutoff.is_finite(), "argument \"cutoff\" is not finite");
@@ -564,12 +552,18 @@ fn zero_and_write_sparse(data: &mut [f64], index: &[usize], value: f64) {
 impl Best {
     fn args(&self) -> usize {
         let number = self.0;
-        assert!(number > 0, "argument \"number\" is less than one");
+        assert!(number > 0, "mate_selection.Best: argument is less than one");
         number
     }
 }
-impl<R: Rng + ?Sized> MateSelection<R> for Best {
-    fn select(&self, rng: &mut R, amount: usize, scores: Vec<f64>) -> Vec<usize> {
+impl MateSelection for Best {
+    fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
+        if amount == 0 {
+            return vec![];
+        } else {
+            assert!(!scores.is_empty());
+        }
+        let rng = &mut rand::rng();
         let num_best = self.args();
         let index = arg_nth_max(num_best, &scores);
         let sample = stochastic_universal_sampling::choose_multiple(rng, amount, index.len());
@@ -600,8 +594,9 @@ impl Percentile {
         arg_nth_max(num_eligible.max(1), scores)
     }
 }
-impl<R: Rng + ?Sized> MateSelection<R> for Percentile {
-    fn select(&self, rng: &mut R, amount: usize, scores: Vec<f64>) -> Vec<usize> {
+impl MateSelection for Percentile {
+    fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
+        let rng = &mut rand::rng();
         let index = self.get_index(&scores);
         let sample = stochastic_universal_sampling::choose_multiple(rng, amount, index.len());
         sample.iter().map(|&s| index[s]).collect()
@@ -618,7 +613,7 @@ impl<R: Rng + ?Sized> MateSelection<R> for Percentile {
     }
 }
 
-impl<R: Rng + ?Sized> MateSelection<R> for RankedLinear {
+impl MateSelection for RankedLinear {
     fn sample_weight(&self, mut scores: Vec<f64>) -> Vec<f64> {
         let selection_pressure = self.0;
         assert!(
@@ -643,7 +638,7 @@ impl<R: Rng + ?Sized> MateSelection<R> for RankedLinear {
     }
 }
 
-impl<R: Rng + ?Sized> MateSelection<R> for RankedExponential {
+impl MateSelection for RankedExponential {
     fn sample_weight(&self, mut scores: Vec<f64>) -> Vec<f64> {
         let median = self.0;
         assert!(median > 0, "argument \"median\" is less than one");
@@ -735,108 +730,98 @@ mod tests {
 
     #[test]
     fn no_data() {
-        let rng = &mut rand::rng();
-        let pairs = Proportional.pairs(rng, 0, vec![]);
+        let pairs = Proportional().pairs(0, vec![]);
         assert!(pairs.is_empty());
 
-        let pairs = Proportional.pairs(rng, 0, vec![1.0, 2.0, 3.0]);
+        let pairs = Proportional().pairs(0, vec![1.0, 2.0, 3.0]);
         assert!(pairs.is_empty());
     }
 
     #[test]
     fn truncate_top_one() {
-        let rng = &mut rand::rng();
         // Truncate all but the single best individual.
         let algo = Percentile(0.99);
         let weights: Vec<f64> = (0..100).map(|x| x as f64 / 100.0).collect();
-        let pairs = algo.pairs(rng, 1, weights);
+        let pairs = algo.pairs(1, weights);
         assert!(pairs == [[99, 99]]);
     }
 
     #[test]
     fn truncate_top_two() {
-        let rng = &mut rand::rng();
         // Truncate all but the best two individuals.
         let algo = Percentile(0.98);
         let weights: Vec<f64> = (0..100).map(|x| x as f64 / 100.0).collect();
-        let pairs = algo.pairs(rng, 1, weights);
+        let pairs = algo.pairs(1, weights);
         assert!(pairs == [[98, 99]] || pairs == [[99, 98]]);
     }
 
     #[test]
     fn truncate_none() {
-        let rng = &mut rand::rng();
         // Truncate none of the individuals.
         let algo = Percentile(0.0);
         let weights: Vec<f64> = (0..100).map(|x| x as f64 / 100.0).collect();
-        let pairs = algo.pairs(rng, 50, weights);
+        let pairs = algo.pairs(50, weights);
         let selected = flatten_and_sort(&pairs);
         assert_eq!(selected, (0..100).collect::<Vec<_>>());
     }
 
     #[test]
     fn truncate_all() {
-        let rng = &mut rand::rng();
         // Truncating all individuals should actually just return the single
         // best individual. This situation happens when building the starting
         // population.
         let algo = Percentile(0.999_999_999); // Technically less than one.
         let weights: Vec<f64> = (0..100).map(|x| x as f64 / 100.0).collect();
-        let pairs = algo.pairs(rng, 1, weights);
+        let pairs = algo.pairs(1, weights);
         assert!(pairs == [[99, 99]]);
     }
 
     #[test]
     fn all_equal_to_the_best() {
-        let rng = &mut rand::rng();
-        Best(3).select(rng, 1, vec![4.0, 4.0, 4.0, 4.0]);
+        Best(3).select(1, vec![4.0, 4.0, 4.0, 4.0]);
     }
 
     #[test]
     fn propotional() {
-        let rng = &mut rand::rng();
         // All scores are equal, proportional should select all of the items.
         let weights = vec![1.0; 10];
-        let algo = Proportional;
-        let selected = flatten_and_sort(&algo.pairs(rng, 5, weights));
+        let algo = Proportional();
+        let selected = flatten_and_sort(&algo.pairs(5, weights));
         assert_eq!(selected, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
     }
 
     #[test]
     fn propotional_outlier() {
-        let rng = &mut rand::rng();
         // Index 0 is an outlier. Proportional selection should allow the
         // outlier to dominate the sample. The other items should not be selected.
         let weights = vec![1000_000_000_000_000.0, 1.0, 1.0, 1.0];
-        let algo = Proportional;
-        let selected = flatten_and_sort(&algo.pairs(rng, 10, weights));
+        let algo = Proportional();
+        let selected = flatten_and_sort(&algo.pairs(10, weights));
         let inliers: Vec<_> = selected.iter().filter(|&idx| *idx != 0).collect();
         assert!(inliers.is_empty());
     }
 
     #[test]
     fn propotional_negative() {
-        let rng = &mut rand::rng();
         // One score is extremely negative and another is NAN.
         // Proportional should ignore them.
         let mut weights = vec![1.0; 12];
         weights[5] = -100.0;
         weights[6] = f64::NAN;
-        let algo = Proportional;
-        let selected = flatten_and_sort(&algo.pairs(rng, 5, weights));
+        let algo = Proportional();
+        let selected = flatten_and_sort(&algo.pairs(5, weights));
         assert_eq!(selected, [0, 1, 2, 3, 4, 7, 8, 9, 10, 11]);
     }
 
     #[test]
     fn normalized() {
-        let rng = &mut rand::rng();
         // Normalize can deal with negative scores, it does not care about their absolute values.
         let weights = vec![-20.0, -12.0, -11.0, -10.5, -10.0, -9.5, -9.0, -8.0, 0.0];
         const MEAN_IDX: usize = 4;
         const MAX_IDX: usize = 8;
         let cutoff = -0.01;
         let algo = Normalized(cutoff);
-        let selected = flatten_and_sort(&algo.pairs(rng, 2, weights));
+        let selected = flatten_and_sort(&algo.pairs(2, weights));
         // Only scores greater than the mean should have been selected.
         assert!(selected.iter().all(|&x| x >= MEAN_IDX));
         // The sample should contain the highest score, but not be dominated by it.
@@ -846,44 +831,40 @@ mod tests {
 
     #[test]
     fn ranked_linear() {
-        let rng = &mut rand::rng();
         // Index 0 is an outlier.
         // Ranking the scores should prevent the outlier from dominating.
         let weights = vec![1000_000_000_000_000.0, 1.0, 1.0, 1.0];
 
         // No selection pressure, should select all four scores.
         let algo = RankedLinear(0.0);
-        let selected = flatten_and_sort(&algo.pairs(rng, 2, weights));
+        let selected = flatten_and_sort(&algo.pairs(2, weights));
         assert_eq!(selected, vec![0, 1, 2, 3]);
     }
 
     /// Finds those off-by-one errors.
     #[test]
     fn ranked_linear_single() {
-        let rng = &mut rand::rng();
         let weights = vec![4.0];
         let algo = RankedLinear(0.5);
-        let selected = flatten_and_sort(&algo.pairs(rng, 1, weights));
+        let selected = flatten_and_sort(&algo.pairs(1, weights));
         assert_eq!(selected, vec![0, 0]);
     }
 
     #[test]
     fn ranked_linear_outlier() {
-        let rng = &mut rand::rng();
         // Index 0 is an outlier.
         // Ranking the scores should prevent the outlier from dominating.
         let mut weights = vec![1000_000_000_000_000.0];
         weights.append(&mut vec![1.0; 1000]);
         // With selection pressure, the outlier still should not dominate the sampling.
         let algo = RankedLinear(1.0);
-        let selected = flatten_and_sort(&algo.pairs(rng, 10, weights));
+        let selected = flatten_and_sort(&algo.pairs(10, weights));
         let inliers: Vec<_> = selected.iter().filter(|&idx| *idx != 0).collect();
         assert!(!inliers.is_empty());
     }
 
     #[test]
     fn ranked_exponential() {
-        let rng = &mut rand::rng();
         let test_cases = [
             (1, 1, 2, 99), // Test selecting with one single weight does not crash.
             (3, 1, 4, 1),
@@ -896,7 +877,7 @@ mod tests {
             let weights: Vec<f64> = (0..num).map(|x| x as f64).collect();
             let algo = RankedExponential(median);
             assert_eq!(sample, (sample / 2) * 2); // Sample count needs to be even for this to work.
-            let selected = flatten_and_sort(&algo.pairs(rng, sample / 2, weights));
+            let selected = flatten_and_sort(&algo.pairs(sample / 2, weights));
             dbg!(&selected);
             // Count how many elements are from the top ranked individuals.
             let top_count_actual = selected
@@ -914,7 +895,6 @@ mod tests {
     /// Check that this avoids mating individuals with themselves.
     #[test]
     fn pairs() {
-        let rng = &mut rand::rng();
         // N is the population size.
         // P is the number of mating pairs.
         // R is the percent of the pairs that are duplicates.
@@ -930,7 +910,7 @@ mod tests {
         ] {
             let p = 10 * n;
             // let p = 3;
-            let indices = Random.pairs(rng, p, vec![1.0; n]);
+            let indices = Random().pairs(p, vec![1.0; n]);
             let num_repeats = indices.iter().filter(|[a, b]| a == b).count();
             let percent_repeats = 100.0 * num_repeats as f64 / indices.len() as f64;
 
@@ -943,19 +923,24 @@ mod tests {
     /// Example of the trait used as an argument.
     #[test]
     fn argument() {
-        type Rng = rand::rngs::ThreadRng;
-
-        fn foobar(select: &dyn MateSelection<Rng>) {
-            let rng = &mut rand::rng();
-            select.select(rng, 0, vec![]);
+        fn foobar(select: &dyn MateSelection) {
+            dbg!(select.select(0, vec![]));
         }
-
-        let x: &dyn MateSelection<Rng> = if rand::random() {
-            &Random
+        let x: &dyn MateSelection = if rand::random() {
+            &Random()
         } else {
-            &Proportional
+            &Proportional()
         };
-
         foobar(x);
+    }
+
+    /// Example of sending a trait object to a new thread.
+    #[test]
+    fn threading() {
+        let trait_object: Box<dyn MateSelection> = Box::new(Random());
+        let handle = std::thread::spawn(move || {
+            dbg!(trait_object.select(0, vec![]));
+        });
+        handle.join().unwrap();
     }
 }
