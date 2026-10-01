@@ -770,19 +770,19 @@ impl MateSelection for Best {
             }
         }
         let rng = &mut rand::rng();
-        let num_best = self.args()?;
+        let num_best = self.args()?.min(scores.len());
         let index = arg_nth_max(num_best, &scores);
         let sample = stochastic_universal_sampling::choose_multiple(rng, amount, index.len());
         Ok(sample.iter().map(|&s| index[s]).collect())
     }
     fn pdf(&self, mut scores: Vec<f64>) -> Result<Vec<f64>> {
-        let num_best = self.args()?;
+        let num_best = self.args()?.min(scores.len());
         let index = arg_nth_max(num_best, &scores);
         zero_and_write_sparse(&mut scores, &index, 1.0 / num_best as f64);
         Ok(scores)
     }
     fn sample_weight(&self, mut scores: Vec<f64>) -> Result<Vec<f64>> {
-        let num_best = self.args()?;
+        let num_best = self.args()?.min(scores.len());
         let index = arg_nth_max(num_best, &scores);
         zero_and_write_sparse(&mut scores, &index, 1.0);
         Ok(scores)
@@ -1000,6 +1000,27 @@ mod tests {
         let algo = Proportional();
         let selected = flatten_and_sort(&algo.pairs(5, weights).unwrap());
         assert_eq!(selected, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+
+    #[test]
+    fn best_and_percentile_small_population() {
+        let scores = vec![1.0, 2.0, 3.0];
+
+        let best = Best(10);
+        let selected = best.select(1, scores.clone()).unwrap();
+        assert_eq!(selected.len(), 1);
+        let pdf = best.pdf(scores.clone()).unwrap();
+        assert_eq!(pdf, vec![1.0/3.0; 3]);
+        let weights = best.sample_weight(scores.clone()).unwrap();
+        assert_eq!(weights, vec![1.0; 3]);
+
+        let percentile = Percentile(0.5);
+        let selected = percentile.select(1, scores.clone()).unwrap();
+        assert_eq!(selected.len(), 1);
+        let pdf = percentile.pdf(scores.clone()).unwrap();
+        assert_eq!(pdf, vec![0.0, 0.5, 0.5]);
+        let weights = percentile.sample_weight(scores.clone()).unwrap();
+        assert_eq!(weights, vec![0.0, 1.0, 1.0]);
     }
 
     #[test]
