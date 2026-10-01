@@ -32,7 +32,7 @@ pub trait MateSelection: std::fmt::Debug + Send + Sync {
             return Ok(vec![]);
         } else {
             if scores.is_empty() {
-                return Err(ArgumentError(format!("cannot select from empty set")));
+                return Err(ArgumentError("cannot select from empty set".to_string()));
             }
         }
 
@@ -72,6 +72,13 @@ impl fmt::Display for ArgumentError {
 }
 
 impl std::error::Error for ArgumentError {}
+
+#[cfg(feature = "pyo3")]
+impl From<ArgumentError> for pyo3::PyErr {
+    fn from(error: ArgumentError) -> Self {
+        pyo3::exceptions::PyValueError::new_err(error.to_string())
+    }
+}
 
 /// Select parents with a uniform random probability, ignoring the scores.
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq)]
@@ -161,7 +168,7 @@ pub struct RankedExponential(pub usize);
 /// exactly one parameter of the appropriate type.
 ///
 /// # Argument Syntax
-/// 
+///
 /// ```text
 /// random
 /// proportional
@@ -176,8 +183,8 @@ pub struct RankedExponential(pub usize);
 ///
 /// Returns an error message if the argument can not be parsed, or if the
 /// number is out of bounds.
-pub fn parse(argument: &str) -> Box<dyn MateSelection> {
-    match Argument::parse(argument).unwrap() {
+pub fn parse(argument: &str) -> Result<Box<dyn MateSelection>> {
+    Ok(match Argument::parse(argument)? {
         Argument::Random => Box::new(Random()),
         Argument::Proportional => Box::new(Proportional()),
         Argument::Normalized(cutoff) => Box::new(Normalized(cutoff)),
@@ -185,7 +192,7 @@ pub fn parse(argument: &str) -> Box<dyn MateSelection> {
         Argument::Percentile(percentile) => Box::new(Percentile(percentile)),
         Argument::RankedLinear(pressure) => Box::new(RankedLinear(pressure)),
         Argument::RankedExponential(median) => Box::new(RankedExponential(median)),
-    }
+    })
 }
 
 #[derive(Debug, PartialEq)]
@@ -413,16 +420,16 @@ mod mate_selection {
         /// * Argument "scores" is the list of reproductive fitness scores.
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
-        fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            self.0.pairs(amount, scores).unwrap()
+        fn pairs(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<[usize; 2]>> {
+            Ok(self.0.pairs(amount, scores)?)
         }
         /// Choose multiple weighted
-        fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            self.0.select(amount, scores).unwrap()
+        fn select(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<usize>> {
+            Ok(self.0.select(amount, scores)?)
         }
         /// Probability distribution function
-        fn pdf(&self, scores: Vec<f64>) -> Vec<f64> {
-            <super::Random as MateSelection>::pdf(&self.0, scores).unwrap()
+        fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
+            Ok(<super::Random as MateSelection>::pdf(&self.0, scores)?)
         }
     }
 
@@ -440,16 +447,16 @@ mod mate_selection {
         /// * Argument "scores" is the list of reproductive fitness scores.
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
-        fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            self.0.pairs(amount, scores).unwrap()
+        fn pairs(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<[usize; 2]>> {
+            Ok(self.0.pairs(amount, scores)?)
         }
         /// Choose multiple weighted
-        fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            self.0.select(amount, scores).unwrap()
+        fn select(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<usize>> {
+            Ok(self.0.select(amount, scores)?)
         }
         /// Probability distribution function
-        fn pdf(&self, scores: Vec<f64>) -> Vec<f64> {
-            <super::Proportional as MateSelection>::pdf(&self.0, scores).unwrap()
+        fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
+            Ok(<super::Proportional as MateSelection>::pdf(&self.0, scores)?)
         }
     }
 
@@ -473,16 +480,16 @@ mod mate_selection {
         /// * Argument "scores" is the list of reproductive fitness scores.
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
-        fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            self.0.pairs(amount, scores).unwrap()
+        fn pairs(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<[usize; 2]>> {
+            Ok(self.0.pairs(amount, scores)?)
         }
         /// Choose multiple weighted
-        fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            self.0.select(amount, scores).unwrap()
+        fn select(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<usize>> {
+            Ok(self.0.select(amount, scores)?)
         }
         /// Probability distribution function
-        fn pdf(&self, scores: Vec<f64>) -> Vec<f64> {
-            <super::Normalized as MateSelection>::pdf(&self.0, scores).unwrap()
+        fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
+            Ok(<super::Normalized as MateSelection>::pdf(&self.0, scores)?)
         }
     }
 
@@ -493,9 +500,7 @@ mod mate_selection {
             if count > 0 {
                 Ok(Self(super::Best(count)))
             } else {
-                Err(PyValueError::new_err(
-                    "argument \"count\" is less than one",
-                ))
+                Err(PyValueError::new_err("argument \"count\" is less than one"))
             }
         }
         fn __str__(&self) -> String {
@@ -506,16 +511,16 @@ mod mate_selection {
         /// * Argument "scores" is the list of reproductive fitness scores.
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
-        fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            self.0.pairs(amount, scores).unwrap()
+        fn pairs(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<[usize; 2]>> {
+            Ok(self.0.pairs(amount, scores)?)
         }
         /// Choose multiple weighted
-        fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            self.0.select(amount, scores).unwrap()
+        fn select(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<usize>> {
+            Ok(self.0.select(amount, scores)?)
         }
         /// Probability distribution function
-        fn pdf(&self, scores: Vec<f64>) -> Vec<f64> {
-            <super::Best as MateSelection>::pdf(&self.0, scores).unwrap()
+        fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
+            Ok(<super::Best as MateSelection>::pdf(&self.0, scores)?)
         }
     }
 
@@ -539,16 +544,16 @@ mod mate_selection {
         /// * Argument "scores" is the list of reproductive fitness scores.
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
-        fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            self.0.pairs(amount, scores).unwrap()
+        fn pairs(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<[usize; 2]>> {
+            Ok(self.0.pairs(amount, scores)?)
         }
         /// Choose multiple weighted
-        fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            self.0.select(amount, scores).unwrap()
+        fn select(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<usize>> {
+            Ok(self.0.select(amount, scores)?)
         }
         /// Probability distribution function
-        fn pdf(&self, scores: Vec<f64>) -> Vec<f64> {
-            <super::Percentile as MateSelection>::pdf(&self.0, scores).unwrap()
+        fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
+            Ok(<super::Percentile as MateSelection>::pdf(&self.0, scores)?)
         }
     }
 
@@ -572,16 +577,16 @@ mod mate_selection {
         /// * Argument "scores" is the list of reproductive fitness scores.
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
-        fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            self.0.pairs(amount, scores).unwrap()
+        fn pairs(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<[usize; 2]>> {
+            Ok(self.0.pairs(amount, scores)?)
         }
         /// Choose multiple weighted
-        fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            self.0.select(amount, scores).unwrap()
+        fn select(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<usize>> {
+            Ok(self.0.select(amount, scores)?)
         }
         /// Probability distribution function
-        fn pdf(&self, scores: Vec<f64>) -> Vec<f64> {
-            <super::RankedLinear as MateSelection>::pdf(&self.0, scores).unwrap()
+        fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
+            Ok(<super::RankedLinear as MateSelection>::pdf(&self.0, scores)?)
         }
     }
 
@@ -605,51 +610,49 @@ mod mate_selection {
         /// * Argument "scores" is the list of reproductive fitness scores.
         /// * Returns a list of pairs of parents to mate together.
         ///   The parents are specified as indices into the scores list.
-        fn pairs(&self, amount: usize, scores: Vec<f64>) -> Vec<[usize; 2]> {
-            self.0.pairs(amount, scores).unwrap()
+        fn pairs(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<[usize; 2]>> {
+            Ok(self.0.pairs(amount, scores)?)
         }
         /// Choose multiple weighted
-        fn select(&self, amount: usize, scores: Vec<f64>) -> Vec<usize> {
-            self.0.select(amount, scores).unwrap()
+        fn select(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<usize>> {
+            Ok(self.0.select(amount, scores)?)
         }
         /// Probability distribution function
-        fn pdf(&self, scores: Vec<f64>) -> Vec<f64> {
-            <super::RankedExponential as MateSelection>::pdf(&self.0, scores).unwrap()
+        fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
+            Ok(<super::RankedExponential as MateSelection>::pdf(&self.0, scores)?)
         }
     }
 
     #[pyfunction]
     fn parse<'py>(py: Python<'py>, argument: &str) -> PyResult<Bound<'py, PyAny>> {
-        match super::Argument::parse(argument) {
-            Ok(super::Argument::Random) => Ok(Bound::new(py, Random(super::Random()))?.into_any()),
+        match super::Argument::parse(argument)? {
+            super::Argument::Random => Ok(Bound::new(py, Random(super::Random()))?.into_any()),
 
-            Ok(super::Argument::Proportional) => {
+            super::Argument::Proportional => {
                 Ok(Bound::new(py, Proportional(super::Proportional()))?.into_any())
             }
 
-            Ok(super::Argument::Best(count)) => {
+            super::Argument::Best(count) => {
                 Ok(Bound::new(py, Best(super::Best(count)))?.into_any())
             }
 
-            Ok(super::Argument::Percentile(percentile)) => {
+            super::Argument::Percentile(percentile) => {
                 Ok(Bound::new(py, Percentile(super::Percentile(percentile)))?.into_any())
             }
 
-            Ok(super::Argument::Normalized(cutoff)) => {
+            super::Argument::Normalized(cutoff) => {
                 Ok(Bound::new(py, Normalized(super::Normalized(cutoff)))?.into_any())
             }
 
-            Ok(super::Argument::RankedLinear(selection_pressure)) => Ok(Bound::new(
+            super::Argument::RankedLinear(selection_pressure) => Ok(Bound::new(
                 py,
                 RankedLinear(super::RankedLinear(selection_pressure)),
             )?
             .into_any()),
 
-            Ok(super::Argument::RankedExponential(median)) => {
+            super::Argument::RankedExponential(median) => {
                 Ok(Bound::new(py, RankedExponential(super::RankedExponential(median)))?.into_any())
             }
-
-            Err(error) => Err(PyValueError::new_err(error.to_string())),
         }
     }
 }
@@ -692,7 +695,9 @@ impl MateSelection for Normalized {
     fn sample_weight(&self, mut scores: Vec<f64>) -> Result<Vec<f64>> {
         let cutoff = self.0;
         if !cutoff.is_finite() {
-            return Err(ArgumentError(format!("argument \"cutoff\" is not finite")));
+            return Err(ArgumentError(
+                "argument \"cutoff\" is not finite".to_string(),
+            ));
         }
 
         // Find and normalize by the average score.
@@ -753,9 +758,9 @@ impl Best {
     fn args(&self) -> Result<usize> {
         let count = self.0;
         if count < 1 {
-            return Err(ArgumentError(format!(
-                "mate_selection.Best: argument `count` is less than one"
-            )));
+            return Err(ArgumentError(
+                "mate_selection.Best: argument `count` is less than one".to_string(),
+            ));
         }
         Ok(count)
     }
@@ -766,7 +771,7 @@ impl MateSelection for Best {
             return Ok(vec![]);
         } else {
             if scores.is_empty() {
-                return Err(ArgumentError(format!("cannot select from empty set")));
+                return Err(ArgumentError("cannot select from empty set".to_string()));
             }
         }
         let rng = &mut rand::rng();
@@ -793,9 +798,9 @@ impl Percentile {
     fn get_index(&self, scores: &[f64]) -> Result<Vec<usize>> {
         let percentile = self.0;
         if !(0.0..=1.0).contains(&percentile) {
-            return Err(ArgumentError(format!(
-                "argument \"percentile\" is out of bounds [0, 1]"
-            )));
+            return Err(ArgumentError(
+                "argument \"percentile\" is out of bounds [0, 1]".to_string(),
+            ));
         }
         let num_eligible = ((1.0 - percentile) * scores.len() as f64).round() as usize;
         Ok(arg_nth_max(num_eligible.max(1), scores))
@@ -824,9 +829,9 @@ impl MateSelection for RankedLinear {
     fn sample_weight(&self, mut scores: Vec<f64>) -> Result<Vec<f64>> {
         let selection_pressure = self.0;
         if !(0.0..=1.0).contains(&selection_pressure) {
-            return Err(ArgumentError(format!(
-                "argument \"selection_pressure\" is out of bounds [0, 1]"
-            )));
+            return Err(ArgumentError(
+                "argument \"selection_pressure\" is out of bounds [0, 1]".to_string(),
+            ));
         }
 
         let div_n = if scores.len() == 1 {
@@ -850,9 +855,9 @@ impl MateSelection for RankedExponential {
     fn sample_weight(&self, mut scores: Vec<f64>) -> Result<Vec<f64>> {
         let median = self.0;
         if median < 1 {
-            return Err(ArgumentError(format!(
-                "argument \"median\" is less than one"
-            )));
+            return Err(ArgumentError(
+                "argument \"median\" is less than one".to_string(),
+            ));
         }
         for (rank, index) in argsort(&scores).iter().enumerate() {
             let rank = scores.len() - rank - 1;
@@ -1010,7 +1015,7 @@ mod tests {
         let selected = best.select(1, scores.clone()).unwrap();
         assert_eq!(selected.len(), 1);
         let pdf = best.pdf(scores.clone()).unwrap();
-        assert_eq!(pdf, vec![1.0/3.0; 3]);
+        assert_eq!(pdf, vec![1.0 / 3.0; 3]);
         let weights = best.sample_weight(scores.clone()).unwrap();
         assert_eq!(weights, vec![1.0; 3]);
 
