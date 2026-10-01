@@ -44,7 +44,12 @@ pub trait MateSelection: std::fmt::Debug + Send + Sync {
     }
 
     /// Probability distribution function
+    ///
+    /// Returns an empty vector if argument scores is empty
     fn pdf(&self, scores: Vec<f64>) -> Result<Vec<f64>> {
+        if scores.is_empty() {
+            return Ok(vec![]);
+        }
         let mut pdf = self.sample_weight(scores)?;
         // Normalize the sum to one.
         let sum: f64 = pdf.iter().sum();
@@ -57,6 +62,8 @@ pub trait MateSelection: std::fmt::Debug + Send + Sync {
 
     /// Transform the reproductive fitness scores into sampling weights.  
     /// The sampling weights do **not** need to sum to one.
+    ///
+    /// Returns an empty vector if argument scores is empty
     fn sample_weight(&self, scores: Vec<f64>) -> Result<Vec<f64>>;
 }
 
@@ -456,7 +463,9 @@ mod mate_selection {
         }
         /// Probability distribution function
         fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
-            Ok(<super::Proportional as MateSelection>::pdf(&self.0, scores)?)
+            Ok(<super::Proportional as MateSelection>::pdf(
+                &self.0, scores,
+            )?)
         }
     }
 
@@ -586,7 +595,9 @@ mod mate_selection {
         }
         /// Probability distribution function
         fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
-            Ok(<super::RankedLinear as MateSelection>::pdf(&self.0, scores)?)
+            Ok(<super::RankedLinear as MateSelection>::pdf(
+                &self.0, scores,
+            )?)
         }
     }
 
@@ -619,7 +630,9 @@ mod mate_selection {
         }
         /// Probability distribution function
         fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
-            Ok(<super::RankedExponential as MateSelection>::pdf(&self.0, scores)?)
+            Ok(<super::RankedExponential as MateSelection>::pdf(
+                &self.0, scores,
+            )?)
         }
     }
 
@@ -699,6 +712,9 @@ impl MateSelection for Normalized {
                 "argument \"cutoff\" is not finite".to_string(),
             ));
         }
+        if scores.is_empty() {
+            return Ok(vec![]);
+        }
 
         // Find and normalize by the average score.
         let mean = scores.iter().sum::<f64>() / scores.len() as f64;
@@ -708,6 +724,9 @@ impl MateSelection for Normalized {
         // Find and normalize by the standard deviation of the scores.
         let var = scores.iter().map(|x| x.powi(2)).sum::<f64>() / scores.len() as f64;
         let std = var.sqrt();
+        if std == 0.0 {
+            panic!();
+        }
         for x in scores.iter_mut() {
             // Shift the entire distribution and cutoff all scores which
             // are less than zero.
@@ -787,6 +806,9 @@ impl MateSelection for Best {
         Ok(scores)
     }
     fn sample_weight(&self, mut scores: Vec<f64>) -> Result<Vec<f64>> {
+        if scores.is_empty() {
+            return Ok(vec![]);
+        }
         let num_best = self.args()?.min(scores.len());
         let index = arg_nth_max(num_best, &scores);
         zero_and_write_sparse(&mut scores, &index, 1.0);
@@ -814,11 +836,17 @@ impl MateSelection for Percentile {
         Ok(sample.iter().map(|&s| index[s]).collect())
     }
     fn pdf(&self, mut scores: Vec<f64>) -> Result<Vec<f64>> {
+        if scores.is_empty() {
+            return Ok(vec![]);
+        }
         let index = self.get_index(&scores)?;
         zero_and_write_sparse(&mut scores, &index, 1.0 / index.len() as f64);
         Ok(scores)
     }
     fn sample_weight(&self, mut scores: Vec<f64>) -> Result<Vec<f64>> {
+        if scores.is_empty() {
+            return Ok(vec![]);
+        }
         let index = self.get_index(&scores)?;
         zero_and_write_sparse(&mut scores, &index, 1.0);
         Ok(scores)
@@ -834,6 +862,9 @@ impl MateSelection for RankedLinear {
             ));
         }
 
+        if scores.is_empty() {
+            return Ok(vec![]);
+        }
         let div_n = if scores.len() == 1 {
             0.0 // Value does not matter, just don't crash.
         } else {
@@ -1005,6 +1036,38 @@ mod tests {
         let algo = Proportional();
         let selected = flatten_and_sort(&algo.pairs(5, weights).unwrap());
         assert_eq!(selected, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+
+    #[test]
+    fn empty_scores() {
+        let selectors: Vec<Box<dyn MateSelection>> = vec![
+            Box::new(Random()),
+            Box::new(Proportional()),
+            Box::new(Normalized(1.0)),
+            Box::new(Best(1)),
+            Box::new(Percentile(0.5)),
+            Box::new(RankedLinear(0.5)),
+            Box::new(RankedExponential(7)),
+        ];
+        for selector in selectors {
+            println!("Testing: {selector:?}");
+            assert!(
+                selector.pdf(vec![]).unwrap().is_empty(),
+                "pdf(vec![]) should return an empty vector"
+            );
+            assert!(
+                selector.sample_weight(vec![]).unwrap().is_empty(),
+                "sample_weight(vec![]) should return an empty vector"
+            );
+            assert!(
+                selector.pairs(1, vec![]).is_err(),
+                "pairs(1, vec![]) should fail"
+            );
+            assert!(
+                selector.select(1, vec![]).is_err(),
+                "select(1, vec![]) should fail"
+            );
+        }
     }
 
     #[test]

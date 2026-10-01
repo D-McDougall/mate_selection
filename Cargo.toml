@@ -10,7 +10,6 @@
     repository   = "https://github.com/D-McDougall/mate_selection.git"
 
 [lib]
-    doctest = false
     crate-type = ["cdylib", "rlib"]
 
 [dependencies]
