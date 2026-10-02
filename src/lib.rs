@@ -81,17 +81,13 @@ pub trait MateSelection: std::fmt::Debug + Send + Sync {
     ///
     /// Returns an error if `amount` is greater than zero and `scores` is empty.
     fn select(&self, amount: usize, scores: Vec<f64>) -> Result<Vec<usize>> {
-        let rng = &mut rand::rng();
-
-        if amount == 0 {
-            return Ok(vec![]);
-        } else {
-            if scores.is_empty() {
-                return Err(ArgumentError("cannot select from empty set".to_string()));
-            }
+        if let Some(retval) = check_args(amount, &scores) {
+            return retval
         }
 
         let weights = self.sample_weight(scores)?;
+
+        let rng = &mut rand::rng();
 
         Ok(stochastic_universal_sampling::choose_multiple_weighted(
             rng, amount, &weights,
@@ -121,6 +117,18 @@ pub trait MateSelection: std::fmt::Debug + Send + Sync {
     ///
     /// Returns an empty vector if `scores` is empty
     fn sample_weight(&self, scores: Vec<f64>) -> Result<Vec<f64>>;
+}
+
+/// Check arguments for all [select] and [pairs] methods.
+fn check_args(amount: usize, scores: &[f64]) -> Option< Result<Vec<usize>>> {
+    if amount == 0 {
+        return Some(Ok(vec![]));
+    } else if scores.is_empty() {
+        return Some(Err(ArgumentError("cannot select from empty set".to_string())));
+    }
+    else {
+        return None
+    }
 }
 
 #[derive(Debug)]
@@ -804,6 +812,9 @@ impl MateSelection for Random {
     }
 
     fn select(&self, amount: usize, scores: Vec<f64>) -> Result<Vec<usize>> {
+        if let Some(retval) = check_args(amount, &scores) {
+            return retval
+        }
         let rng = &mut rand::rng();
         Ok(stochastic_universal_sampling::choose_multiple(
             rng,
@@ -905,16 +916,12 @@ impl Best {
 }
 impl MateSelection for Best {
     fn select(&self, amount: usize, scores: Vec<f64>) -> Result<Vec<usize>> {
-        if amount == 0 {
-            return Ok(vec![]);
-        } else {
-            if scores.is_empty() {
-                return Err(ArgumentError("cannot select from empty set".to_string()));
-            }
+        if let Some(retval) = check_args(amount, &scores) {
+            return retval
         }
-        let rng = &mut rand::rng();
         let num_best = self.args()?.min(scores.len());
         let index = arg_nth_max(num_best, &scores);
+        let rng = &mut rand::rng();
         let sample = stochastic_universal_sampling::choose_multiple(rng, amount, index.len());
         Ok(sample.iter().map(|&s| index[s]).collect())
     }
@@ -949,8 +956,11 @@ impl Percentile {
 }
 impl MateSelection for Percentile {
     fn select(&self, amount: usize, scores: Vec<f64>) -> Result<Vec<usize>> {
-        let rng = &mut rand::rng();
+        if let Some(retval) = check_args(amount, &scores) {
+            return retval
+        }
         let index = self.get_index(&scores)?;
+        let rng = &mut rand::rng();
         let sample = stochastic_universal_sampling::choose_multiple(rng, amount, index.len());
         Ok(sample.iter().map(|&s| index[s]).collect())
     }
