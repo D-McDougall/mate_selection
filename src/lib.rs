@@ -70,7 +70,10 @@ pub trait MateSelection: std::fmt::Debug + Send + Sync {
     /// The implementation attempts to avoid pairing an individual with itself,
     /// but on rare occasions may return a pair of the same element.
     fn pairs(&self, amount: usize, scores: Vec<f64>) -> Result<Vec<[usize; 2]>> {
-        let mut pairs = self.select(amount * 2, scores)?;
+        let Some(double) = amount.checked_mul(2) else {
+            return Err(ArgumentError("argument `amount` is too large".to_string()));
+        };
+        let mut pairs = self.select(double, scores)?;
 
         reduce_repeats(&mut pairs);
 
@@ -82,7 +85,7 @@ pub trait MateSelection: std::fmt::Debug + Send + Sync {
     /// Returns an error if `amount` is greater than zero and `scores` is empty.
     fn select(&self, amount: usize, scores: Vec<f64>) -> Result<Vec<usize>> {
         if let Some(retval) = check_args(amount, &scores) {
-            return retval
+            return retval;
         }
 
         let weights = self.sample_weight(scores)?;
@@ -104,6 +107,11 @@ pub trait MateSelection: std::fmt::Debug + Send + Sync {
         let mut pdf = self.sample_weight(scores)?;
         // Normalize the sum to one.
         let sum: f64 = pdf.iter().sum();
+        if sum == 0.0 {
+            let uniform = 1.0 / pdf.len() as f64;
+            pdf.fill(uniform);
+            return Ok(pdf)
+        }
         let div_sum = 1.0 / sum;
         for x in pdf.iter_mut() {
             *x *= div_sum;
@@ -120,14 +128,15 @@ pub trait MateSelection: std::fmt::Debug + Send + Sync {
 }
 
 /// Check arguments for all [select] and [pairs] methods.
-fn check_args(amount: usize, scores: &[f64]) -> Option< Result<Vec<usize>>> {
+fn check_args(amount: usize, scores: &[f64]) -> Option<Result<Vec<usize>>> {
     if amount == 0 {
         return Some(Ok(vec![]));
     } else if scores.is_empty() {
-        return Some(Err(ArgumentError("cannot select from empty set".to_string())));
-    }
-    else {
-        return None
+        return Some(Err(ArgumentError(
+            "cannot select from empty set".to_string(),
+        )));
+    } else {
+        return None;
     }
 }
 
@@ -813,7 +822,7 @@ impl MateSelection for Random {
 
     fn select(&self, amount: usize, scores: Vec<f64>) -> Result<Vec<usize>> {
         if let Some(retval) = check_args(amount, &scores) {
-            return retval
+            return retval;
         }
         let rng = &mut rand::rng();
         Ok(stochastic_universal_sampling::choose_multiple(
@@ -855,7 +864,7 @@ impl MateSelection for Normalized {
         let var = scores.iter().map(|x| x.powi(2)).sum::<f64>() / scores.len() as f64;
         let std = var.sqrt();
         if std == 0.0 {
-            panic!();
+            return Random().sample_weight(scores);
         }
         for x in scores.iter_mut() {
             // Shift the entire distribution and cutoff all scores which
@@ -917,7 +926,7 @@ impl Best {
 impl MateSelection for Best {
     fn select(&self, amount: usize, scores: Vec<f64>) -> Result<Vec<usize>> {
         if let Some(retval) = check_args(amount, &scores) {
-            return retval
+            return retval;
         }
         let num_best = self.args()?.min(scores.len());
         let index = arg_nth_max(num_best, &scores);
@@ -957,7 +966,7 @@ impl Percentile {
 impl MateSelection for Percentile {
     fn select(&self, amount: usize, scores: Vec<f64>) -> Result<Vec<usize>> {
         if let Some(retval) = check_args(amount, &scores) {
-            return retval
+            return retval;
         }
         let index = self.get_index(&scores)?;
         let rng = &mut rand::rng();
@@ -1444,6 +1453,86 @@ mod tests {
                 Argument::parse(input).is_err(),
                 "expected invalid argument to fail: {input:?}"
             );
+        }
+    }
+
+    fn all_selectors() -> Vec<Box<dyn MateSelection>> {
+        vec![
+            Box::new(Random()),
+            Box::new(Proportional()),
+            Box::new(Normalized(1.0)),
+            Box::new(Best(2)),
+            Box::new(Percentile(0.8)),
+            Box::new(RankedLinear(0.5)),
+            Box::new(RankedExponential(3)),
+        ]
+    }
+
+    fn assert_valid_pdf(pdf: &[f64]) {
+        assert!(
+            pdf.iter().all(|p| p.is_finite() && *p >= 0.0),
+            "PDF must contain only finite, nonnegative probabilities: {pdf:?}"
+        );
+        let sum: f64 = pdf.iter().sum();
+        assert!(
+            (sum - 1.0).abs() < 1e-12,
+            "PDF must sum to one, got {sum}: {pdf:?}"
+        );
+    }
+
+    fn assert_valid_weights(weights: &[f64]) {
+        assert!(
+            weights.iter().all(|w| w.is_finite() && *w >= 0.0),
+            "Weights must be finite and nonnegative: {weights:?}"
+        );
+    }
+
+    #[test]
+    fn degenerate_score_invariants() {
+        let score_cases = vec![
+            ("zero variance", vec![3.0; 4]),
+            ("zero values", vec![0.0; 4]),
+            // TODO:
+            // ("negative infinite", vec![0.0, 1.0, 2.0, f64::NEG_INFINITY]),
+            // ("postitive infinite", vec![0.0, 1.0, 2.0, f64::INFINITY]),
+            // ("not a number", vec![0.0, 1.0, 2.0, f64::NAN]),
+        ];
+
+        for (case_name, scores) in score_cases {
+            for selector in all_selectors() {
+                let name = format!("{selector:?} ({case_name})");
+                println!("TESTING: {name}");
+
+                let weights = selector
+                    .sample_weight(scores.clone())
+                    .unwrap_or_else(|e| panic!("{name}: sample_weight failed: {e}"));
+                assert_eq!(weights.len(), scores.len(), "{name}");
+                assert_valid_weights(&weights);
+
+                let pdf = selector
+                    .pdf(scores.clone())
+                    .unwrap_or_else(|e| panic!("{name}: pdf failed: {e}"));
+                assert_eq!(pdf.len(), scores.len(), "{name}");
+                assert_valid_pdf(&pdf);
+
+                let selected = selector
+                    .select(20, scores.clone())
+                    .unwrap_or_else(|e| panic!("{name}: select failed: {e}"));
+                assert_eq!(selected.len(), 20, "{name}");
+                assert!(
+                    selected.iter().all(|&i| i < scores.len()),
+                    "{name}: selection returned an invalid index"
+                );
+
+                let pairs = selector
+                    .pairs(20, scores.clone())
+                    .unwrap_or_else(|e| panic!("{name}: select failed: {e}"));
+                assert_eq!(pairs.len(), 20, "{name}");
+                assert!(
+                    pairs.iter().all(|&p| p.iter().all(|&i|i < scores.len())),
+                    "{name}: pairs returned an invalid index"
+                );
+            }
         }
     }
 }
