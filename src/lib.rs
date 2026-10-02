@@ -1,21 +1,74 @@
-//! A collection of mate selection methods for evolutionary algorithms
+//! Mate selection methods for evolutionary algorithms
+//!
+//! This crate provides several strategies for selecting individuals from a
+//! population to serve as parents in an evolutionary algorithm. Each
+//! individual is represented by a reproductive fitness score, and a selection
+//! method determines the probability with which individuals are selected.
+//!
+//! Selection methods range from uniform random selection to methods that
+//! strongly favor individuals with high fitness. Both score-based and
+//! rank-based methods are provided, allowing selection pressure to be based
+//! either on the magnitude of fitness scores or only on their relative
+//! ordering.
+//!
+//! The crate also provides [parse], which converts a specification string
+//! into a selection method. This is useful for applications that expose mate
+//! selection as a command-line option or configuration value.
+//!
+//! Selection methods are stochastic: selecting the same population repeatedly
+//! will always produce different results. Currently, this crate does not
+//! support custom random number generators or seeds.
+//!
+//! # Example
+//!
+//! ```
+//! use mate_selection::{MateSelection, Proportional};
+//!
+//! let selector = Proportional();
+//!
+//! let scores = vec![1.0, 2.0, 3.0, 4.0];
+//!
+//! let probabilities = selector.pdf(scores.clone()).unwrap();
+//! println!("{probabilities:?}");
+//!
+//! let parents = selector.select(10, scores.clone()).unwrap();
+//! println!("{parents:?}");
+//!
+//! let pairs = selector.pairs(5, scores).unwrap();
+//! println!("{pairs:?}");
+//! ```
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// Mate selection algorithms randomly select pairs of individuals from a population.  
-/// The sampling probability of each individuals is a function of its reproductive fitness or "score".  
+/// A mate selection strategy for an evolutionary algorithm.
+///
+/// Mate selection algorithms randomly select individuals or pairs of
+/// individuals from a population. The sampling probability for each individual
+/// is a function of its reproductive fitness: which is its _score_.
+///
+/// A population or individuals is represented by a vector of reproductive fitness scores,
+/// with one score for each individual. A [`MateSelection`] implementation
+/// transforms these scores into sampling weights and uses those weights to
+/// select parents.
+///
+/// Methods [select](MateSelection::select) and [pairs](MateSelection::pairs)
+/// return indices into the input `scores` vector rather than the scores
+/// themselves. Thus, for example, an index of `2` refers to the individual
+/// represented by `scores[2]`.
 pub trait MateSelection: std::fmt::Debug + Send + Sync {
     /// Choose multiple weighted pairs
     ///
     /// * Argument `amount` is the number of pairs to return.
     ///
-    /// * Argument "scores" is a list containing the reproductive fitness of each individual.
+    /// * Argument `scores` is a list containing the reproductive fitness of each individual.
     ///
     /// * Returns a list of pairs of parents to mate together.  
     ///   The parents are specified as indices into the scores list.
+    ///   Returns an error if `amount` is greater than zero and `scores` is empty.
     ///
-    /// This implementation almost never mates an individual with itself.
+    /// The implementation attempts to avoid pairing an individual with itself,
+    /// but on rare occasions may return a pair of the same element.
     fn pairs(&self, amount: usize, scores: Vec<f64>) -> Result<Vec<[usize; 2]>> {
         let mut pairs = self.select(amount * 2, scores)?;
 
@@ -25,6 +78,8 @@ pub trait MateSelection: std::fmt::Debug + Send + Sync {
     }
 
     /// Choose multiple weighted
+    ///
+    /// Returns an error if `amount` is greater than zero and `scores` is empty.
     fn select(&self, amount: usize, scores: Vec<f64>) -> Result<Vec<usize>> {
         let rng = &mut rand::rng();
 
@@ -43,9 +98,9 @@ pub trait MateSelection: std::fmt::Debug + Send + Sync {
         ))
     }
 
-    /// Probability distribution function
+    /// Probability Distribution Function (PDF)
     ///
-    /// Returns an empty vector if argument scores is empty
+    /// Returns an empty vector if `scores` is empty
     fn pdf(&self, scores: Vec<f64>) -> Result<Vec<f64>> {
         if scores.is_empty() {
             return Ok(vec![]);
@@ -60,10 +115,11 @@ pub trait MateSelection: std::fmt::Debug + Send + Sync {
         Ok(pdf)
     }
 
-    /// Transform the reproductive fitness scores into sampling weights.  
-    /// The sampling weights do **not** need to sum to one.
+    /// Transform the reproductive fitness scores into sampling weights.
+    /// * Weights must be non-negative.
+    /// * Weights do **not** need to sum to one.
     ///
-    /// Returns an empty vector if argument scores is empty
+    /// Returns an empty vector if `scores` is empty
     fn sample_weight(&self, scores: Vec<f64>) -> Result<Vec<f64>>;
 }
 
@@ -105,7 +161,7 @@ pub struct Random();
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq)]
 pub struct Proportional();
 
-/// Normalize the fitness scores into a standard normal distribution.
+/// Sigma Scaling --- Normalize the fitness scores into a standard normal distribution.
 /// First the scores are normalized into a standard distribution and then they
 /// are shifted by the cutoff, which is naturally measured in standard deviations.
 /// All scores which are less than the cutoff (now sub-zero) are
@@ -167,7 +223,7 @@ pub struct RankedLinear(pub f64);
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq)]
 pub struct RankedExponential(pub usize);
 
-/// Parse a `--selection` command line argument into a mate selection object.
+/// Parse a specification string into a mate selection object.
 ///
 /// The argument consists of the name of a mate selection method, optionally
 /// followed by an equal sign `=` and a numeric parameter. Methods without
@@ -319,13 +375,51 @@ impl Argument {
     }
 }
 
-/// A collection of mate selection methods for evolutionary algorithms
+/// Mate selection methods for evolutionary algorithms
 ///
-/// Mate selection algorithms randomly select pairs of individuals from a
-/// population. The sampling probability of each individuals is a function
-/// of its reproductive fitness or "score".
+/// This module provides several strategies for selecting individuals from a
+/// population to serve as parents in an evolutionary algorithm. Each
+/// individual is represented by a reproductive fitness score, and a selection
+/// method determines the probability with which individuals are selected.
 ///
-/// These implementations almost never mate an individual with itself.
+/// Selection methods range from uniform random selection to methods that
+/// strongly favor individuals with high fitness. Both score-based and
+/// rank-based methods are provided, allowing selection pressure to be based
+/// either on the magnitude of fitness scores or only on their relative
+/// ordering.
+///
+/// A population or individuals is represented by a vector of reproductive
+/// fitness scores, with one score for each individual. Methods `select` and
+/// `pairs` return indices into the input `scores` vector rather than the
+/// scores themselves. Thus, for example, an index of 2 refers to the
+/// individual represented by `scores[2]`.
+///
+/// # Specification Strings
+///
+/// The module also provides the function `parse`, which converts a
+/// specification string into a selection method. This is useful for
+/// applications that expose mate selection as a command-line option or
+/// configuration value.
+///
+/// # Randomness
+///
+/// Selection methods are stochastic: selecting the same population repeatedly
+/// will always produce different results. Currently, this crate does not
+/// support custom random number generators or seeds.
+///
+/// # Example
+///
+/// ```
+/// import mate_selection
+///
+/// selector = mate_selection.Proportional()
+///
+/// scores = [1.0, 2.0, 3.0, 4.0]
+///
+/// print(selector.pdf(scores))
+/// print(selector.select(10, scores))
+/// print(selector.pairs(5, scores))
+/// ```
 #[cfg(feature = "pyo3")]
 #[pyo3::pymodule]
 mod mate_selection {
@@ -351,14 +445,15 @@ mod mate_selection {
     #[pyclass]
     struct Proportional(super::Proportional);
 
-    /// Normalize the fitness scores into a standard normal distribution. First
-    /// the scores are normalized into a standard distribution and then they
-    /// are shifted by the cutoff, which is naturally measured in standard
-    /// deviations. All scores which are less than the cutoff (now sub-zero)
-    /// are discarded and those individuals are not permitted to mate. Finally
-    /// the scores are divided by their sum to yield a selection probability.
-    /// This method improves upon the proportional method by controlling for
-    /// the magnitude and variation of the fitness scoring function.
+    /// Sigma Scaling ---- Normalize the fitness scores into a standard normal
+    /// distribution. First the scores are normalized into a standard
+    /// distribution and then they are shifted by the cutoff, which is
+    /// naturally measured in standard deviations. All scores which are less
+    /// than the cutoff (now sub-zero) are discarded and those individuals
+    /// are not permitted to mate. Finally the scores are divided by their
+    /// sum to yield a selection probability. This method improves upon the
+    /// proportional method by controlling for the magnitude and variation of
+    /// the fitness scoring function.
     ///
     /// Argument "cutoff" is the minimum negative deviation required for mating.
     #[pyclass]
@@ -413,6 +508,37 @@ mod mate_selection {
     #[pyclass]
     struct RankedExponential(super::RankedExponential);
 
+    macro_rules! pairs_doc {
+        () => {
+            r#"Choose multiple weighted pairs
+
+            Argument `amount` is the number of pairs to return.
+
+            Argument `scores` is a list containing the reproductive fitness of each individual.
+
+            Returns a list of pairs of parents to mate together.
+            The parents are specified as indices into the scores list.
+            Returns an error if `amount` is greater than zero and `scores` is empty.
+
+            The implementation attempts to avoid pairing an individual with itself,
+            but on rare occasions may return a pair of the same element."#
+        };
+    }
+    macro_rules! select_doc {
+        () => {
+            r#"Choose multiple weighted
+
+            Returns an error if `amount` is greater than zero and `scores` is empty."#
+        };
+    }
+    macro_rules! pdf_doc {
+        () => {
+            r#"Probability Distribution Function (PDF)
+
+            Returns an empty vector if `scores` is empty"#
+        };
+    }
+
     #[pymethods]
     impl Random {
         #[new]
@@ -422,19 +548,15 @@ mod mate_selection {
         fn __str__(&self) -> String {
             "mate_selection.Random()".to_string()
         }
-        /// Choose multiple weighted pairs
-        /// * Argument "amount" is the number of pairs to return.
-        /// * Argument "scores" is the list of reproductive fitness scores.
-        /// * Returns a list of pairs of parents to mate together.
-        ///   The parents are specified as indices into the scores list.
+        #[doc=pairs_doc!()]
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<[usize; 2]>> {
             Ok(self.0.pairs(amount, scores)?)
         }
-        /// Choose multiple weighted
+        #[doc=select_doc!()]
         fn select(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<usize>> {
             Ok(self.0.select(amount, scores)?)
         }
-        /// Probability distribution function
+        #[doc=pdf_doc!()]
         fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
             Ok(<super::Random as MateSelection>::pdf(&self.0, scores)?)
         }
@@ -449,19 +571,15 @@ mod mate_selection {
         fn __str__(&self) -> String {
             "mate_selection.Proportional()".to_string()
         }
-        /// Choose multiple weighted pairs
-        /// * Argument "amount" is the number of pairs to return.
-        /// * Argument "scores" is the list of reproductive fitness scores.
-        /// * Returns a list of pairs of parents to mate together.
-        ///   The parents are specified as indices into the scores list.
+        #[doc=pairs_doc!()]
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<[usize; 2]>> {
             Ok(self.0.pairs(amount, scores)?)
         }
-        /// Choose multiple weighted
+        #[doc=select_doc!()]
         fn select(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<usize>> {
             Ok(self.0.select(amount, scores)?)
         }
-        /// Probability distribution function
+        #[doc=pdf_doc!()]
         fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
             Ok(<super::Proportional as MateSelection>::pdf(
                 &self.0, scores,
@@ -484,19 +602,15 @@ mod mate_selection {
         fn __str__(&self) -> String {
             format!("mate_selection.Normalized({})", self.0 .0)
         }
-        /// Choose multiple weighted pairs
-        /// * Argument "amount" is the number of pairs to return.
-        /// * Argument "scores" is the list of reproductive fitness scores.
-        /// * Returns a list of pairs of parents to mate together.
-        ///   The parents are specified as indices into the scores list.
+        #[doc=pairs_doc!()]
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<[usize; 2]>> {
             Ok(self.0.pairs(amount, scores)?)
         }
-        /// Choose multiple weighted
+        #[doc=select_doc!()]
         fn select(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<usize>> {
             Ok(self.0.select(amount, scores)?)
         }
-        /// Probability distribution function
+        #[doc=pdf_doc!()]
         fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
             Ok(<super::Normalized as MateSelection>::pdf(&self.0, scores)?)
         }
@@ -515,19 +629,15 @@ mod mate_selection {
         fn __str__(&self) -> String {
             format!("mate_selection.Best({})", self.0 .0)
         }
-        /// Choose multiple weighted pairs
-        /// * Argument "amount" is the number of pairs to return.
-        /// * Argument "scores" is the list of reproductive fitness scores.
-        /// * Returns a list of pairs of parents to mate together.
-        ///   The parents are specified as indices into the scores list.
+        #[doc=pairs_doc!()]
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<[usize; 2]>> {
             Ok(self.0.pairs(amount, scores)?)
         }
-        /// Choose multiple weighted
+        #[doc=select_doc!()]
         fn select(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<usize>> {
             Ok(self.0.select(amount, scores)?)
         }
-        /// Probability distribution function
+        #[doc=pdf_doc!()]
         fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
             Ok(<super::Best as MateSelection>::pdf(&self.0, scores)?)
         }
@@ -548,19 +658,15 @@ mod mate_selection {
         fn __str__(&self) -> String {
             format!("mate_selection.Percentile({})", self.0 .0)
         }
-        /// Choose multiple weighted pairs
-        /// * Argument "amount" is the number of pairs to return.
-        /// * Argument "scores" is the list of reproductive fitness scores.
-        /// * Returns a list of pairs of parents to mate together.
-        ///   The parents are specified as indices into the scores list.
+        #[doc=pairs_doc!()]
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<[usize; 2]>> {
             Ok(self.0.pairs(amount, scores)?)
         }
-        /// Choose multiple weighted
+        #[doc=select_doc!()]
         fn select(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<usize>> {
             Ok(self.0.select(amount, scores)?)
         }
-        /// Probability distribution function
+        #[doc=pdf_doc!()]
         fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
             Ok(<super::Percentile as MateSelection>::pdf(&self.0, scores)?)
         }
@@ -581,19 +687,15 @@ mod mate_selection {
         fn __str__(&self) -> String {
             format!("mate_selection.RankedLinear({})", self.0 .0)
         }
-        /// Choose multiple weighted pairs
-        /// * Argument "amount" is the number of pairs to return.
-        /// * Argument "scores" is the list of reproductive fitness scores.
-        /// * Returns a list of pairs of parents to mate together.
-        ///   The parents are specified as indices into the scores list.
+        #[doc=pairs_doc!()]
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<[usize; 2]>> {
             Ok(self.0.pairs(amount, scores)?)
         }
-        /// Choose multiple weighted
+        #[doc=select_doc!()]
         fn select(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<usize>> {
             Ok(self.0.select(amount, scores)?)
         }
-        /// Probability distribution function
+        #[doc=pdf_doc!()]
         fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
             Ok(<super::RankedLinear as MateSelection>::pdf(
                 &self.0, scores,
@@ -616,19 +718,15 @@ mod mate_selection {
         fn __str__(&self) -> String {
             format!("mate_selection.RankedExponential({})", self.0 .0)
         }
-        /// Choose multiple weighted pairs
-        /// * Argument "amount" is the number of pairs to return.
-        /// * Argument "scores" is the list of reproductive fitness scores.
-        /// * Returns a list of pairs of parents to mate together.
-        ///   The parents are specified as indices into the scores list.
+        #[doc=pairs_doc!()]
         fn pairs(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<[usize; 2]>> {
             Ok(self.0.pairs(amount, scores)?)
         }
-        /// Choose multiple weighted
+        #[doc=select_doc!()]
         fn select(&self, amount: usize, scores: Vec<f64>) -> PyResult<Vec<usize>> {
             Ok(self.0.select(amount, scores)?)
         }
-        /// Probability distribution function
+        #[doc=pdf_doc!()]
         fn pdf(&self, scores: Vec<f64>) -> PyResult<Vec<f64>> {
             Ok(<super::RankedExponential as MateSelection>::pdf(
                 &self.0, scores,
@@ -636,6 +734,27 @@ mod mate_selection {
         }
     }
 
+    /// Parse a specification string into a mate selection object.
+    ///
+    /// The argument consists of the name of a mate selection method, optionally
+    /// followed by an equal sign `=` and a numeric parameter. Methods without
+    /// parameters are specified by name alone. Methods with parameters require
+    /// exactly one parameter of the appropriate type.
+    ///
+    /// Argument Syntax:
+    ///
+    ///     random
+    ///     proportional
+    ///     normalized=<cutoff>
+    ///     best=<count>
+    ///     percentile=<percentile>
+    ///     ranked-linear=<pressure>
+    ///     ranked-exponential=<median>
+    ///
+    /// Errors:
+    ///
+    /// Returns a value error message if the argument can not be parsed,
+    /// or if the number is out of bounds.
     #[pyfunction]
     fn parse<'py>(py: Python<'py>, argument: &str) -> PyResult<Bound<'py, PyAny>> {
         match super::Argument::parse(argument)? {

@@ -2,9 +2,10 @@
 
 A collection of mate selection methods for evolutionary algorithms
 
-Mate selection algorithms randomly select pairs of individuals from a
-population. The sampling probability of each individuals is a function of its
-reproductive fitness or "score".
+This packagge provides several strategies for selecting individuals from a
+population to serve as parents in an evolutionary algorithm. Each individual
+is represented by a reproductive fitness score, and a mate selection method
+determines the probability with which individuals are selected.
 
 * [**pypi.org**](https://pypi.org/project/mate_selection/)
 * [**crates.io**](https://crates.io/crates/mate_selection)
@@ -12,7 +13,7 @@ reproductive fitness or "score".
 
 # Features
 
-* Seven mate-selection algorithms
+* Several mate-selection algorithms
 * A unified API for all seven methods
 * Sample individuals or mating pairs
 * Probability Distribution (PDF) calculation
@@ -21,6 +22,10 @@ reproductive fitness or "score".
 * Rust Support
 
 ## Mate Selection Methods
+
+Available methods range from uniform random selection to methods that strongly
+favor individuals with high fitness. Both score-based and rank-based methods
+are provided.
 
 | Method              | Parameter            | Behavior                                     |
 | :------------------ | :------------------- | :------------------------------------------- |
@@ -55,7 +60,7 @@ later reconstructed from that representation.
 Selection methods also support serialization through serde (in rust) and
 pickle (in python).
 
-### Example command-line arguments:
+### Example Specification Strings:
 
 ```text
 random
@@ -73,6 +78,10 @@ The `mate_selection` package uses the [`rand`](https://github.com/rust-random/ra
 crate's thread-local random number generator (RNG). Currently this package
 does not support alternate RNGs. Also, this package does not suport changing
 the random seed, so all deterministic output is not currently possible.
+
+All methods use
+[stochastic_universal_sampling](https://github.com/D-McDougall/stochastic_universal_sampling)
+to select individuals.
 
 ## NaN and Infinite Handling
 
@@ -118,22 +127,26 @@ $ cargo add mate_selection
 ```rust
 use mate_selection::{MateSelection, Proportional};
 
-fn main() {
-    let selector = Proportional();
+let selector = Proportional();
 
-    let scores = vec![1.0, 2.0, 3.0, 4.0];
+let scores = vec![1.0, 2.0, 3.0, 4.0];
 
-    let probabilities = selector.pdf(scores.clone()).unwrap();
-    println!("{probabilities:?}");
+let probabilities = selector.pdf(scores.clone()).unwrap();
+println!("{probabilities:?}");
 
-    let parents = selector.select(10, scores.clone()).unwrap();
-    println!("{parents:?}");
+let parents = selector.select(10, scores.clone()).unwrap();
+println!("{parents:?}");
 
-    let pairs = selector.pairs(5, scores).unwrap();
-    println!("{pairs:?}");
-}
+let pairs = selector.pairs(5, scores).unwrap();
+println!("{pairs:?}");
 ```
 
+# References
+
+* Introduction to Evolutionary Computing  
+  A.E. Eiben and J.E. Smith, 2003, 2015  
+  <https://doi.org/10.1007/978-3-662-44874-8>  
+  _(See chapter 5)_
 
 # Copyright & License
 
