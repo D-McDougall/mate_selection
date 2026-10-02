@@ -110,7 +110,7 @@ pub trait MateSelection: std::fmt::Debug + Send + Sync {
         if sum == 0.0 {
             let uniform = 1.0 / pdf.len() as f64;
             pdf.fill(uniform);
-            return Ok(pdf)
+            return Ok(pdf);
         }
         let div_sum = 1.0 / sum;
         for x in pdf.iter_mut() {
@@ -130,13 +130,13 @@ pub trait MateSelection: std::fmt::Debug + Send + Sync {
 /// Check arguments for all [select] and [pairs] methods.
 fn check_args(amount: usize, scores: &[f64]) -> Option<Result<Vec<usize>>> {
     if amount == 0 {
-        return Some(Ok(vec![]));
+        Some(Ok(vec![]))
     } else if scores.is_empty() {
-        return Some(Err(ArgumentError(
+        Some(Err(ArgumentError(
             "cannot select from empty set".to_string(),
-        )));
+        )))
     } else {
-        return None;
+        None
     }
 }
 
@@ -1492,10 +1492,13 @@ mod tests {
         let score_cases = vec![
             ("zero variance", vec![3.0; 4]),
             ("zero values", vec![0.0; 4]),
-            // TODO:
-            // ("negative infinite", vec![0.0, 1.0, 2.0, f64::NEG_INFINITY]),
-            // ("postitive infinite", vec![0.0, 1.0, 2.0, f64::INFINITY]),
-            // ("not a number", vec![0.0, 1.0, 2.0, f64::NAN]),
+            ("slightly negative values", vec![0.0_f64.next_down(); 4]),
+            // ("slightly positive values", vec![0.0_f64.next_up(); 4]), // TODO
+            ("very negative values", vec![-1e308; 4]),
+            // ("very positive values", vec![1e308; 4]), // TODO
+            ("negative infinite", vec![0.0, 1.0, 2.0, f64::NEG_INFINITY]),
+            // ("postitive infinite", vec![0.0, 1.0, 2.0, f64::INFINITY]), // TODO
+            // ("not a number", vec![0.0, 1.0, 2.0, f64::NAN]), // TODO
         ];
 
         for (case_name, scores) in score_cases {
@@ -1529,7 +1532,7 @@ mod tests {
                     .unwrap_or_else(|e| panic!("{name}: select failed: {e}"));
                 assert_eq!(pairs.len(), 20, "{name}");
                 assert!(
-                    pairs.iter().all(|&p| p.iter().all(|&i|i < scores.len())),
+                    pairs.iter().all(|&p| p.iter().all(|&i| i < scores.len())),
                     "{name}: pairs returned an invalid index"
                 );
             }
