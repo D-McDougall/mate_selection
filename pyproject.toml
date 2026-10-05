@@ -2,6 +2,7 @@
     name = "mate_selection"
     requires-python = ">=3.9"
     description = "A collection of mate selection methods for evolutionary algorithms"
+    readme = "README.md"
     keywords = ["algorithms", "random", "sampling"]
     classifiers = [
         "Development Status :: 5 - Production/Stable",
